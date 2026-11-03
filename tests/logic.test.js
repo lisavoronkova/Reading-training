@@ -129,3 +129,46 @@ test('задания всех уровней корректны', () => {
     }
   }
 });
+
+test('шарики: на шариках нет одинаково звучащих складов', () => {
+  const L = Levels.build(Words);
+  assert.equal(L.listen.length, 10);
+  for (const level of L.listen) {
+    for (let seed = 1; seed <= 40; seed++) {
+      for (const options of [2, 3, 4]) {
+        const tasks = Levels.makeTasks(level, Words, { count: 8, options, rng: seeded(seed * 13 + options), knownLetters: { м: true } });
+        assert.equal(tasks.length, 8, level.id);
+        for (const t of tasks) {
+          assert.equal(t.options.length, options, level.id);
+          assert.equal(t.options[t.answer], t.sklad);
+          const keys = t.options.map(Sklady.soundKey);
+          assert.equal(new Set(keys).size, keys.length, level.id + ': ' + t.options.join(','));
+        }
+      }
+    }
+  }
+  assert.equal(Sklady.soundKey('жё'), Sklady.soundKey('жо'));
+  assert.equal(Sklady.soundKey('ча'), Sklady.soundKey('чя'));
+});
+
+test('паровозик: в вагончиках все склады слова и один лишний', () => {
+  const L = Levels.build(Words);
+  assert.equal(L.build.length, 6);
+  for (const level of L.build) {
+    assert.ok(level.pool.length >= 5, level.id + ' мало слов');
+    for (let seed = 1; seed <= 30; seed++) {
+      const tasks = Levels.makeTasks(level, Words, { count: 8, rng: seeded(seed) });
+      assert.ok(tasks.length >= 5 && tasks.length <= 6, level.id);
+      for (const t of tasks) {
+        assert.equal(t.tray.length, t.target.sklady.length + 1);
+        const rest = t.tray.slice();
+        for (const s of t.target.sklady) {
+          const i = rest.indexOf(s);
+          assert.ok(i >= 0, level.id + ' ' + t.target.text);
+          rest.splice(i, 1);
+        }
+        assert.ok(!t.target.sklady.map(Sklady.soundKey).includes(Sklady.soundKey(rest[0])), t.target.text + ' лишний ' + rest[0]);
+      }
+    }
+  }
+});

@@ -91,18 +91,58 @@
       '</svg>';
   }
 
-  function html(character) {
-    var look = character && character.look;
-    if (look === 'photo' && character.image) {
-      return '<div class="critter critter--photo" data-critter>' +
-        '<img class="critter-photo" src="' + character.image + '" alt="">' +
-        '<span class="critter-mood" aria-hidden="true"></span></div>';
-    }
-    if (look === 'photo' || look === 'hamster') {
-      return '<div class="critter critter--hamster" data-critter>' + hamster() + '<span class="critter-mood" aria-hidden="true"></span></div>';
-    }
-    return '<div class="critter critter--unicat" data-critter>' + unicat() + '<span class="critter-mood" aria-hidden="true"></span></div>';
+  /* Наряды открываются за звёзды. slot: head — голова, face — глаза, neck — шея. */
+  var ACCESSORIES = [
+    { id: 'bow', e: '🎀', name: 'бантик', slot: 'head', stars: 3 },
+    { id: 'scarf', e: '🧣', name: 'шарфик', slot: 'neck', stars: 6 },
+    { id: 'flower', e: '🌸', name: 'цветочек', slot: 'head', stars: 10 },
+    { id: 'glasses', e: '👓', name: 'очки', slot: 'face', stars: 15 },
+    { id: 'cap', e: '🧢', name: 'кепка', slot: 'head', stars: 20 },
+    { id: 'beads', e: '📿', name: 'бусы', slot: 'neck', stars: 26 },
+    { id: 'tophat', e: '🎩', name: 'шляпа', slot: 'head', stars: 33 },
+    { id: 'shades', e: '🕶️', name: 'тёмные очки', slot: 'face', stars: 40 },
+    { id: 'medal', e: '🏅', name: 'медаль', slot: 'neck', stars: 50 },
+    { id: 'crown', e: '👑', name: 'корона', slot: 'head', stars: 60 }
+  ];
+  var ACC_BY_ID = {};
+  ACCESSORIES.forEach(function (a) { ACC_BY_ID[a.id] = a; });
+
+  var ANCHORS = {
+    unicat: { head: [70, 16, 26], face: [50, 46, 34], neck: [50, 78, 24] },
+    hamster: { head: [50, 12, 30], face: [50, 45, 34], neck: [50, 78, 24] },
+    photo: { head: [50, 2, 30], face: [50, 40, 34], neck: [50, 86, 26] }
+  };
+
+  function outfitHTML(look, outfit) {
+    if (!outfit) return '';
+    var a = ANCHORS[look] || ANCHORS.hamster;
+    return ['neck', 'face', 'head'].map(function (slot) {
+      var acc = ACC_BY_ID[outfit[slot]];
+      if (!acc) return '';
+      var pos = a[slot];
+      return '<span class="acc acc--' + slot + '" aria-hidden="true" style="left:' + pos[0] + '%;top:' + pos[1] + '%;font-size:' + pos[2] + 'cqw">' + acc.e + '</span>';
+    }).join('');
   }
 
-  root.Characters = { LOOKS: LOOKS, html: html };
+  var STATES = ['eat', 'yuck', 'happy'];
+
+  function html(character, outfit) {
+    var look = character && character.look;
+    var images = (character && character.images) || {};
+    var normal = images.normal || (character && character.image);
+    if (look === 'photo' && normal) {
+      var extra = STATES.map(function (st) {
+        return images[st] ? '<img class="critter-photo ph-' + st + '" src="' + images[st] + '" alt="">' : '';
+      }).join('');
+      return '<div class="critter critter--photo" data-critter>' +
+        '<img class="critter-photo ph-normal" src="' + normal + '" alt="">' + extra +
+        '<span class="critter-mood" aria-hidden="true"></span>' + outfitHTML('photo', outfit) + '</div>';
+    }
+    if (look === 'photo' || look === 'hamster') {
+      return '<div class="critter critter--hamster" data-critter>' + hamster() + '<span class="critter-mood" aria-hidden="true"></span>' + outfitHTML('hamster', outfit) + '</div>';
+    }
+    return '<div class="critter critter--unicat" data-critter>' + unicat() + '<span class="critter-mood" aria-hidden="true"></span>' + outfitHTML('unicat', outfit) + '</div>';
+  }
+
+  root.Characters = { LOOKS: LOOKS, ACCESSORIES: ACCESSORIES, ACC_BY_ID: ACC_BY_ID, html: html };
 })(typeof self !== 'undefined' ? self : this);

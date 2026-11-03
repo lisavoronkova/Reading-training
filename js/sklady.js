@@ -179,8 +179,50 @@
     return word.sklady.slice(range.from, range.to + 1).join('');
   }
 
+  /* Таблица складов: строки — согласные, столбцы — гласные. */
+  var CONSONANTS = 'бвгджзклмнпрстфхцчшщ'.split('');
+  var HARD = 'аоуыэ'.split('');
+  var SOFT = 'яёюие'.split('');
+  var PAIRS = { 'а': 'я', 'о': 'ё', 'у': 'ю', 'ы': 'и', 'э': 'е', 'я': 'а', 'ё': 'о', 'ю': 'у', 'и': 'ы', 'е': 'э' };
+
+  function possible(c, v) {
+    if ('жшчщ'.indexOf(c) >= 0 && v === 'ы') return false;
+    if ('чщц'.indexOf(c) >= 0 && 'яю'.indexOf(v) >= 0) return false;
+    if ('жш'.indexOf(c) >= 0 && v === 'я') return false;
+    if ('кгх'.indexOf(c) >= 0 && 'ыяюё'.indexOf(v) >= 0) return false;
+    if ('чщ'.indexOf(c) >= 0 && v === 'э') return false;
+    return true;
+  }
+
+  /* Как склад звучит: ЖЁ и ЖО, ЧА и ЧЯ, ЦЕ и ЦЭ звучат одинаково. */
+  var TO_HARD = { 'ё': 'о', 'е': 'э', 'и': 'ы', 'ю': 'у', 'я': 'а' };
+  var TO_SOFT = { 'а': 'я', 'о': 'ё', 'у': 'ю', 'ы': 'и', 'э': 'е' };
+  function soundKey(s) {
+    if (s.length !== 2) return s;
+    var c = s[0];
+    var v = s[1];
+    if ('жшц'.indexOf(c) >= 0 && TO_HARD[v]) return c + TO_HARD[v];
+    if ('чщ'.indexOf(c) >= 0 && TO_SOFT[v]) return c + TO_SOFT[v];
+    return s;
+  }
+
+  function openSklady(vowels, consonants) {
+    var out = [];
+    (consonants || CONSONANTS).forEach(function (c) {
+      vowels.forEach(function (v) { if (possible(c, v)) out.push(c + v); });
+    });
+    return out;
+  }
+
   return {
     VOWELS: VOWELS,
+    CONSONANTS: CONSONANTS,
+    HARD: HARD,
+    SOFT: SOFT,
+    PAIRS: PAIRS,
+    possible: possible,
+    soundKey: soundKey,
+    openSklady: openSklady,
     FORMS: FORMS,
     FORM_ORDER: FORM_ORDER,
     isVowel: isVowel,

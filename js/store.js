@@ -5,33 +5,39 @@
   'use strict';
 
   var KEY = 'olya-zoya-reading.v1';
+  var VERSION = 2;
 
   function defaultProfile(id, name, character, reading) {
     return {
       id: id,
       name: name,
-      reading: reading,          // 'beginner' — только начинает, 'reader' — уже читает
-      options: reading === 'reader' ? 4 : 3,
+      // 'prereader' — не знает букв, 'beginner' — знает буквы, начинает читать склады, 'reader' — читает по слогам
+      reading: reading,
+      options: 'auto',           // 'auto' или 2 / 3 / 4
+      autoOptions: reading === 'prereader' ? 2 : 3,
       tasks: 8,
       restMinutes: 15,
       autoVoice: false,
       cockroach: true,
       character: character,
+      outfit: { head: null, face: null, neck: null },
       tutorialDone: false,
-      progress: {},              // levelId -> { stars, plays }
-      pantry: {},                // эмодзи -> сколько раз съедено
-      stats: { days: {}, total: 0, firstTry: 0, skladErrors: {}, wordErrors: {}, taps: {} }
+      check: { done: false, skipped: false, date: null, letters: {}, sklady: {}, forms: {} },
+      progress: {},              // levelId -> { stars, plays, known }
+      pantry: {},                // эмодзи угощения -> сколько раз
+      stickers: {},              // эмодзи наклейки -> сколько раз
+      stats: { days: {}, total: 0, firstTry: 0, skladErrors: {}, wordErrors: {}, taps: {}, bestStreak: 0 }
     };
   }
 
   function defaults() {
     return {
-      version: 1,
-      settings: { voiceURI: null, rate: 0.85, sounds: true, letterCase: 'upper' },
+      version: VERSION,
+      settings: { voiceURI: null, rate: 0.85, sounds: true, music: true, letterCase: 'upper' },
       order: ['olya', 'zoya'],
       profiles: {
-        olya: defaultProfile('olya', 'Оля', { look: 'hamster', name: 'Хомка', image: null }, 'beginner'),
-        zoya: defaultProfile('zoya', 'Зоя', { look: 'unicat', name: 'Радужка', image: null }, 'beginner')
+        olya: defaultProfile('olya', 'Оля', { look: 'hamster', name: 'Хомка', images: {} }, 'reader'),
+        zoya: defaultProfile('zoya', 'Зоя', { look: 'unicat', name: 'Радужка', images: {} }, 'prereader')
       }
     };
   }
@@ -49,12 +55,35 @@
     return base;
   }
 
+  function migrate(data, savedVersion) {
+    if ((savedVersion || 1) < 2) {
+      // Родители рассказали: Зоя пока не знает букв, Оля читает по слогам.
+      data.profiles.zoya.reading = 'prereader';
+      data.profiles.olya.reading = 'reader';
+      ['olya', 'zoya'].forEach(function (id) {
+        var p = data.profiles[id];
+        p.options = 'auto';
+        p.autoOptions = p.reading === 'prereader' ? 2 : 3;
+        if (p.character.image && !(p.character.images && p.character.images.normal)) {
+          p.character.images = p.character.images || {};
+          p.character.images.normal = p.character.image;
+        }
+        delete p.character.image;
+      });
+    }
+    data.version = VERSION;
+    return data;
+  }
+
   var Store = {
     load: function () {
       var data = defaults();
       try {
         var raw = root.localStorage.getItem(KEY);
-        if (raw) data = merge(data, JSON.parse(raw));
+        if (raw) {
+          var saved = JSON.parse(raw);
+          data = migrate(merge(data, saved), saved.version);
+        }
       } catch (e) { /* хранилище недоступно — играем без сохранения */ }
       return data;
     },
@@ -69,16 +98,16 @@
     resetProfile: function (data, id) {
       var p = data.profiles[id];
       var fresh = defaultProfile(id, p.name, p.character, p.reading);
-      fresh.options = p.options; fresh.tasks = p.tasks; fresh.restMinutes = p.restMinutes;
-      fresh.autoVoice = p.autoVoice; fresh.cockroach = p.cockroach; fresh.tutorialDone = true;
+      ['options', 'tasks', 'restMinutes', 'autoVoice', 'cockroach'].forEach(function (k) { fresh[k] = p[k]; });
+      fresh.tutorialDone = true;
       data.profiles[id] = fresh;
     },
-    today: function () {
-      var d = new Date();
+    dayKey: function (d) {
       var m = d.getMonth() + 1;
       var day = d.getDate();
       return d.getFullYear() + '-' + (m < 10 ? '0' : '') + m + '-' + (day < 10 ? '0' : '') + day;
-    }
+    },
+    today: function () { return Store.dayKey(new Date()); }
   };
 
   root.Store = Store;

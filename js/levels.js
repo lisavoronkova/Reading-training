@@ -37,6 +37,31 @@
       match: function () { return true; } }
   ];
 
+  /* «Шарики»: игра называет склад или гласную, ребёнок лопает нужный шарик. */
+  var COMMON = 'мпбдтнлрсквгзжш'.split('');
+  var LISTEN_DEFS = [
+    { id: 'l1', title: 'Гласные А, О, У, Ы, Э', mode: 'easy', items: function () { return Sklady.HARD.slice(); } },
+    { id: 'l2', title: 'Гласные Я, Ё, Ю, И, Е', mode: 'easy', items: function () { return Sklady.SOFT.slice(); } },
+    { id: 'l3', title: 'Все гласные: А или Я?', mode: 'similar', items: function () { return Sklady.HARD.concat(Sklady.SOFT); } },
+    { id: 'l4', title: 'Склады с А', mode: 'easy', items: function () { return Sklady.openSklady(['а'], COMMON); } },
+    { id: 'l5', title: 'Склады с О и У', mode: 'easy', items: function () { return Sklady.openSklady(['о', 'у'], COMMON); } },
+    { id: 'l6', title: 'Склады с Ы', mode: 'easy', items: function () { return Sklady.openSklady(['ы'], COMMON); } },
+    { id: 'l7', title: 'Склады с Я, Ё, Ю', mode: 'easy', items: function () { return Sklady.openSklady(['я', 'ё', 'ю'], COMMON); } },
+    { id: 'l8', title: 'Склады с И и Е', mode: 'easy', items: function () { return Sklady.openSklady(['и', 'е'], COMMON); } },
+    { id: 'l9', title: 'Все склады', mode: 'easy', items: function () { return Sklady.openSklady(Sklady.HARD.concat(Sklady.SOFT)); } },
+    { id: 'l10', title: 'Похожие склады', mode: 'similar', items: function () { return Sklady.openSklady(Sklady.HARD.concat(Sklady.SOFT), COMMON); } }
+  ];
+
+  /* «Паровозик»: собрать слово из складов-вагончиков. */
+  var BUILD_DEFS = [
+    { id: 'b1', title: 'Два склада', forms: ['open2'], max: 2 },
+    { id: 'b2', title: 'Склад и согласная', forms: ['cvc', 'openC'], max: 3 },
+    { id: 'b3', title: 'Три склада', forms: ['open3'], max: 3 },
+    { id: 'b4', title: 'Согласные рядом', forms: ['startCluster', 'midCluster'], max: 4 },
+    { id: 'b5', title: 'С Й и мягким знаком', forms: ['yot', 'soft'], max: 4 },
+    { id: 'b6', title: 'Длинные слова', forms: ['open4', 'long', 'separator'], max: 6 }
+  ];
+
   var THEME_CHUNK = 10;
 
   function uniq(arr) {
@@ -44,7 +69,7 @@
     return arr.filter(function (x) { if (seen[x]) return false; seen[x] = true; return true; });
   }
 
-  function build(words) {
+  function buildAll(words) {
     var all = words.all;
     var byId = {};
     var syllables = SYLLABLE_DEFS.map(function (def) {
@@ -82,7 +107,21 @@
       return { theme: t, levels: levels };
     });
 
-    return { syllables: syllables, forms: forms, themes: themes, byId: byId };
+    var listen = LISTEN_DEFS.map(function (def) {
+      var items = def.items();
+      var lvl = { id: def.id, section: 'listen', kind: 'listen', title: def.title, mode: def.mode, items: items, examples: items.slice(0, 3) };
+      byId[lvl.id] = lvl;
+      return lvl;
+    });
+
+    var build = BUILD_DEFS.map(function (def) {
+      var pool = all.filter(function (w) { return def.forms.indexOf(w.form) >= 0 && w.sklady.length <= def.max; });
+      var lvl = { id: def.id, section: 'build', kind: 'build', title: def.title, pool: pool };
+      byId[lvl.id] = lvl;
+      return lvl;
+    });
+
+    return { listen: listen, syllables: syllables, forms: forms, build: build, themes: themes, byId: byId };
   }
 
   function shuffle(arr, rng) {
@@ -186,12 +225,80 @@
     return shuffle(withErrors.concat(rest).slice(0, count), rng);
   }
 
+  function skladCons(s) { return s.length === 2 ? s[0] : ''; }
+  function skladVowel(s) { return s[s.length - 1]; }
+
+  function listenTasks(level, opts, rng) {
+    var count = opts.count || 8;
+    var n = Math.max(2, Math.min(4, opts.options || 2));
+    var known = opts.knownLetters || {};
+    var items = shuffle(level.items, rng);
+    // склады со знакомыми буквами — вперёд
+    items.sort(function (a, b) {
+      var ka = known[skladCons(a) || a] ? 0 : 1;
+      var kb = known[skladCons(b) || b] ? 0 : 1;
+      return ka - kb;
+    });
+    var targets = [];
+    for (var i = 0; targets.length < count && i < count * 3; i++) targets.push(items[i % items.length]);
+    var all = level.items;
+    var last = [];
+    return targets.map(function (t) {
+      var c = skladCons(t);
+      var v = skladVowel(t);
+      var key = Sklady.soundKey(t);
+      var others = all.filter(function (x) { return Sklady.soundKey(x) !== key; });
+      var tiers;
+      if (level.mode === 'similar') {
+        var pair = c ? c + Sklady.PAIRS[v] : Sklady.PAIRS[v];
+        var sameCons = others.filter(function (x) { return c && skladCons(x) === c; });
+        tiers = [others.filter(function (x) { return x === pair; }), sameCons, others];
+      } else {
+        tiers = [others.filter(function (x) { return skladCons(x) !== c && skladVowel(x) !== v; }), others];
+      }
+      var chosen = [];
+      tiers.forEach(function (tier) {
+        shuffle(tier, rng).forEach(function (x) {
+          var dup = chosen.some(function (y) { return Sklady.soundKey(y) === Sklady.soundKey(x); });
+          if (chosen.length < n - 1 && !dup) chosen.push(x);
+        });
+      });
+      var answer = Math.floor(rng() * (chosen.length + 1));
+      if (last.length === 2 && last[0] === answer && last[1] === answer) answer = (answer + 1) % (chosen.length + 1);
+      last.push(answer);
+      if (last.length > 2) last.shift();
+      var options = chosen.slice();
+      options.splice(answer, 0, t);
+      return { kind: 'listen', sklad: t, options: options, answer: answer };
+    });
+  }
+
+  function buildTasks(level, opts, rng) {
+    var count = Math.min(opts.count || 6, 6);
+    var errors = opts.errorWords || {};
+    var pool = shuffle(level.pool, rng);
+    var withErrors = pool.filter(function (w) { return errors[w.text]; }).slice(0, 2);
+    var targets = withErrors.concat(pool.filter(function (w) { return withErrors.indexOf(w) < 0; })).slice(0, count);
+    return shuffle(targets, rng).map(function (w) {
+      var first = w.sklady[0];
+      var c = first.length === 2 ? first[0] : '';
+      var keys = w.sklady.map(Sklady.soundKey);
+      var candidates = Sklady.openSklady(Sklady.HARD.concat(Sklady.SOFT)).filter(function (s) { return keys.indexOf(Sklady.soundKey(s)) < 0; });
+      var similar = candidates.filter(function (s) { return c && s[0] === c; });
+      var extra = (similar.length ? similar : candidates)[Math.floor(rng() * (similar.length || candidates.length))];
+      var tray = shuffle(w.sklady.concat([extra]), rng);
+      return { kind: 'build', target: w, tray: tray };
+    });
+  }
+
   /*
-   * Задания уровня. opts: { count, options, rng, errorWords }
+   * Задания уровня. opts: { count, options, rng, errorWords, knownLetters }
    * Возвращает [{ target, options: [word], answer: index }]
    */
   function makeTasks(level, words, opts) {
     var rng = opts.rng || Math.random;
+    if (level.kind === 'listen') return listenTasks(level, opts, rng);
+    if (level.kind === 'build') return buildTasks(level, opts, rng);
     var count = opts.count || 8;
     var nOptions = Math.max(2, Math.min(4, opts.options || 3));
     var conflict = words.conflict;
@@ -210,7 +317,7 @@
       if (lastAnswers.length > 2) lastAnswers.shift();
       var options = distractors.slice();
       options.splice(answer, 0, target);
-      return { target: target, sklad: level.kind === 'syllable' ? target.sklady[0] : null, options: options, answer: answer };
+      return { kind: level.kind, target: target, sklad: level.kind === 'syllable' ? target.sklady[0] : null, options: options, answer: answer };
     });
   }
 
@@ -220,5 +327,5 @@
     return 1;
   }
 
-  return { SYLLABLE_DEFS: SYLLABLE_DEFS, build: build, makeTasks: makeTasks, stars: stars, shuffle: shuffle };
+  return { SYLLABLE_DEFS: SYLLABLE_DEFS, LISTEN_DEFS: LISTEN_DEFS, BUILD_DEFS: BUILD_DEFS, build: buildAll, makeTasks: makeTasks, stars: stars, shuffle: shuffle };
 });
