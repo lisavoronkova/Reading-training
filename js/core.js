@@ -110,7 +110,12 @@
       return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c];
     });
   };
-  App.save = function () { return Store.save(data); };
+  App.save = function () {
+    if (App.Cloud) App.Cloud.stamp();
+    var ok = Store.save(data);
+    if (App.Cloud) App.Cloud.schedule();
+    return ok;
+  };
   App.profile = function () { return data.profiles[ui.profileId]; };
   App.lettered = function (t) { return data.settings.letterCase === 'lower' ? t.toLowerCase() : t.toUpperCase(); };
   App.pick = function (arr) { return arr[Math.floor(Math.random() * arr.length)]; };
@@ -323,8 +328,9 @@
         Sfx.stopMusic();
         App.addPlayTime();
         App.save();
-      } else if (ui.game && !ui.game.startedAt) {
-        ui.game.startedAt = Date.now();
+      } else {
+        if (ui.game && !ui.game.startedAt) ui.game.startedAt = Date.now();
+        if (App.Cloud) App.Cloud.pull();
       }
     });
     Sfx.enabled = data.settings.sounds;
@@ -333,6 +339,7 @@
     Speech.onVoices(function () {
       if (ui.screen === 'profiles' || (ui.screen === 'parents' && ui.params.tab === 'settings')) App.render();
     });
+    if (App.Cloud) App.Cloud.init();
     App.go('profiles');
   };
 

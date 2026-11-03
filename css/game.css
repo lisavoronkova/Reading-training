@@ -833,3 +833,8 @@ input, select { -webkit-user-select: auto; user-select: auto; }
   0%, 100% { filter: drop-shadow(0 3px 0 var(--paper)) drop-shadow(0 0 6px #ffd54a); }
   50% { filter: drop-shadow(0 3px 0 var(--paper)) drop-shadow(0 0 16px #ff8fd0); }
 }
+
+/* ---------- сохранение ---------- */
+.save-status { margin: 0; padding: 10px 14px; border-radius: 14px; background: var(--sky-low); border: 2px solid var(--edge); }
+.save-status--ok { background: #effaf2; border-color: var(--grass); }
+.save-status--warn { background: var(--sun-soft); border-color: var(--sun); }

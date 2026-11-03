@@ -76,6 +76,11 @@
   }
 
   var Store = {
+    /* Профиль из облака или старой версии, дополненный недостающими полями. */
+    normalizeProfile: function (id, obj) {
+      var base = defaults().profiles[id] || defaultProfile(id, (obj && obj.name) || id, { look: 'hamster', name: 'Хомка', images: {} }, 'beginner');
+      return merge(base, JSON.parse(JSON.stringify(obj || {})));
+    },
     load: function () {
       var data = defaults();
       try {

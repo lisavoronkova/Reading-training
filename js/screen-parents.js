@@ -222,7 +222,8 @@
       var tab = params.tab || 'progress';
       var body;
       if (tab === 'settings') {
-        body = voiceSettings() + data.order.map(function (id) { return childSettings(data.profiles[id]); }).join('');
+        body = '<fieldset class="panel"><legend>Сохранение прогресса</legend>' + (App.Cloud ? App.Cloud.statusHTML() : '') + '</fieldset>' +
+          voiceSettings() + data.order.map(function (id) { return childSettings(data.profiles[id]); }).join('');
       } else if (tab === 'help') {
         body = '<div class="help">' + HELP.map(function (h) { return '<article class="panel"><h2>' + h[0] + '</h2><p>' + h[1] + '</p></article>'; }).join('') + '</div>';
       } else {
@@ -250,6 +251,14 @@
         canvas.getContext('2d').drawImage(img, 0, 0, canvas.width, canvas.height);
         var url = canvas.toDataURL('image/webp', 0.88);
         if (url.indexOf('data:image/webp') !== 0) url = canvas.toDataURL('image/png');
+        if (url.length > 180000) {
+          // слишком тяжёлая для облака — JPEG на белом фоне
+          var ctx = canvas.getContext('2d');
+          ctx.globalCompositeOperation = 'destination-over';
+          ctx.fillStyle = '#ffffff';
+          ctx.fillRect(0, 0, canvas.width, canvas.height);
+          url = canvas.toDataURL('image/jpeg', 0.85);
+        }
         done(url);
       };
       img.onerror = function () { done(null); };
