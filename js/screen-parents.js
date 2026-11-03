@@ -217,12 +217,83 @@
     ['Где хранится прогресс', 'Только на этом устройстве и в этом браузере.']
   ];
 
+  /* ---------- резервная копия ---------- */
+
+  var BACKUP_APP = 'olya-zoya-reading';
+
+  function backupPanel() {
+    var pending = App.ui.params.pendingImport;
+    return '<fieldset class="panel"><legend>Резервная копия</legend>' +
+      '<p>Весь прогресс обеих девочек в одном файле. Сохраните его на компьютер или в облачный диск — потом его можно загрузить обратно на любом устройстве.</p>' +
+      '<div class="row-actions"><button class="btn btn--small" data-act="backup-save">Сохранить копию в файл</button></div>' +
+      (pending
+        ? '<p class="note">Заменить весь прогресс на копию от ' + esc(pending.date) + '? ' +
+          '<button class="btn btn--small btn--danger" data-act="backup-apply">Да, заменить</button> ' +
+          '<button class="btn btn--small" data-act="backup-cancel">Нет</button></p>'
+        : '<label class="field"><span>Загрузить копию из файла</span><input type="file" accept=".json,application/json" id="backup-file" data-field="backup"></label>') +
+      '</fieldset>';
+  }
+
+  App.ACTIONS['backup-save'] = function (el) {
+    var payload = JSON.stringify({ app: BACKUP_APP, savedAt: new Date().toISOString(), data: App.data });
+    var name = 'chtenie-progress-' + App.Store.today() + '.json';
+    var report = function (ok) { el.textContent = ok ? 'Копия сохранена ✓' : 'Не получилось сохранить копию'; };
+    function plainDownload() {
+      var url = URL.createObjectURL(new Blob([payload], { type: 'application/json' }));
+      var a = document.createElement('a');
+      a.href = url;
+      a.download = name;
+      document.body.appendChild(a);
+      a.click();
+      setTimeout(function () { URL.revokeObjectURL(url); a.remove(); }, 1000);
+      report(true);
+    }
+    var c = window.claude;
+    if (!c || typeof c.use !== 'function') { plainDownload(); return; }
+    c.use('downloads').then(function (dl) {
+      if (!dl) { report(false); return; }
+      dl.save({ filename: name, data: payload }).then(function () { report(true); }, function (e) {
+        if (!e || e.code !== 'declined') report(false);
+      });
+    });
+  };
+
+  App.ACTIONS['backup-cancel'] = function () {
+    App.ui.params.pendingImport = null;
+    App.render();
+  };
+
+  App.ACTIONS['backup-apply'] = function () {
+    var imp = App.ui.params.pendingImport;
+    if (!imp) return;
+    var src = imp.data;
+    var now = Date.now();
+    if (src.settings) Object.assign(data.settings, src.settings);
+    var order = Array.isArray(src.order) ? src.order.filter(function (id) { return src.profiles[id]; }) : [];
+    if (order.length) data.order = order;
+    var profiles = {};
+    data.order.forEach(function (id) {
+      profiles[id] = App.Store.normalizeProfile(id, src.profiles[id] || data.profiles[id]);
+      profiles[id].updatedAt = now;
+    });
+    data.profiles = profiles;
+    data.updatedAt = now;
+    Sfx.enabled = data.settings.sounds;
+    Sfx.music.on = data.settings.music;
+    Speech.rate = data.settings.rate;
+    App.save();
+    App.ui.params.pendingImport = null;
+    App.render();
+    note('Прогресс загружен из копии.');
+  };
+
   App.SCREENS.parents = {
     html: function (params) {
       var tab = params.tab || 'progress';
       var body;
       if (tab === 'settings') {
         body = '<fieldset class="panel"><legend>Сохранение прогресса</legend>' + (App.Cloud ? App.Cloud.statusHTML() : '') + '</fieldset>' +
+          backupPanel() +
           voiceSettings() + data.order.map(function (id) { return childSettings(data.profiles[id]); }).join('');
       } else if (tab === 'help') {
         body = '<div class="help">' + HELP.map(function (h) { return '<article class="panel"><h2>' + h[0] + '</h2><p>' + h[1] + '</p></article>'; }).join('') + '</div>';
@@ -306,6 +377,22 @@
             }
             App.render();
           });
+        }
+        return;
+      case 'backup':
+        if (el.files && el.files[0]) {
+          var reader = new FileReader();
+          reader.onload = function () {
+            var obj = null;
+            try { obj = JSON.parse(reader.result); } catch (e) { obj = null; }
+            if (!obj || obj.app !== BACKUP_APP || !obj.data || !obj.data.profiles) {
+              note('Это не файл копии игры. Выберите файл chtenie-progress-….json.');
+              return;
+            }
+            App.ui.params.pendingImport = { date: String(obj.savedAt || '').slice(0, 10).split('-').reverse().join('.'), data: obj.data };
+            App.render();
+          };
+          reader.readAsText(el.files[0]);
         }
         return;
       case 'voice': data.settings.voiceURI = el.value; Speech.choose(el.value); break;

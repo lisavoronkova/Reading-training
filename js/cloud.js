@@ -207,7 +207,11 @@
   Cloud.init = function () {
     Cloud.stamp();
     var c = window.claude;
-    if (!c || typeof c.use !== 'function') return;
+    if (!c || typeof c.use !== 'function') {
+      // Свой хостинг: просим браузер не стирать сохранённое.
+      try { if (navigator.storage && navigator.storage.persist) navigator.storage.persist().catch(function () {}); } catch (e) { /* не поддерживается */ }
+      return;
+    }
     setState('connecting');
     Promise.all([c.use('db'), c.use('user')]).then(function (r) {
       var db = r[0];
@@ -234,7 +238,7 @@
       case 'error':
         return '<p class="save-status save-status--warn">Не получилось сохранить в облако. Прогресс пока лежит в этом браузере, игра попробует снова при следующем ответе.</p>';
       default:
-        return '<p class="save-status save-status--warn">Прогресс хранится только в этом браузере. Чтобы он не пропадал, открывайте игру по ссылке на claude.ai, войдя в свой аккаунт.</p>';
+        return '<p class="save-status save-status--warn">Прогресс хранится в этом браузере на этом устройстве. Чтобы он не пропал: установите игру на главный экран (в Safari: «Поделиться» → «На экран „Домой“») и время от времени сохраняйте резервную копию в файл — кнопка ниже.</p>';
     }
   };
 })();
