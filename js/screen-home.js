@@ -113,8 +113,8 @@
               '<span class="play-sub">' + esc(App.levelLabel(rec)) + '</span></span></button>' +
             '<nav class="extras">' +
               '<button class="extra" data-act="go" data-to="themes"><span class="extra-icon" aria-hidden="true">🗂️</span><span>Темы</span></button>' +
-              '<button class="extra" data-act="go" data-to="album"><span class="extra-icon" aria-hidden="true">📒</span><span>Альбом</span><span class="extra-count">' + stickers + '</span></button>' +
-              '<button class="extra" data-act="go" data-to="wardrobe"><span class="extra-icon" aria-hidden="true">👗</span><span>Гардероб</span><span class="extra-count">' + unlocked + '</span></button>' +
+              '<button class="extra" data-act="go" data-to="album"><span class="extra-icon" aria-hidden="true">📒</span><span>Альбом</span>' + (stickers ? '<span class="extra-count">' + stickers + '</span>' : '') + '</button>' +
+              '<button class="extra" data-act="go" data-to="wardrobe"><span class="extra-icon" aria-hidden="true">👗</span><span>Гардероб</span>' + (unlocked ? '<span class="extra-count">' + unlocked + '</span>' : '') + '</button>' +
               '<button class="extra" data-act="go" data-to="pantry"><span class="extra-icon" aria-hidden="true">🍯</span><span>Кладовая</span></button>' +
               '<button class="extra" data-act="go" data-to="table"><span class="extra-icon" aria-hidden="true">🔤</span><span>Таблица</span></button>' +
             '</nav>' +

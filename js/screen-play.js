@@ -279,6 +279,7 @@
     g.buildPos = 0;
     $('#build-picture').innerHTML = '<span class="build-emoji">' + w.emoji + '</span><span class="build-ear" aria-hidden="true">🔊</span>';
     $('#train').className = 'train';
+    $('#train').style.setProperty('--n', w.sklady.length);
     $('#train').innerHTML = '<span class="loco" aria-hidden="true">🚂</span>' + w.sklady.map(function (s, i) {
       return '<span class="wagon wagon--c' + (i % WAGON_COLORS) + '"><span class="wagon-slot" data-slot="' + i + '"></span></span>';
     }).join('');
